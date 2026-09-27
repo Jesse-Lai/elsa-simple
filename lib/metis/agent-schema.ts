@@ -1,0 +1,12 @@
+import { z } from 'zod';
+import { datasetById } from './datasets';
+import { analysisModeIds, defaultAnalysisMode } from './analysis-modes';
+import { pathRequestSchema } from './path-reasoning';
+const metricId=z.enum(['activation','latency','crashes','retention','sessions']);
+const role=z.enum(['target','guardrail','fundamental','excluded']);
+const metricMap=<T extends z.ZodTypeAny>(schema:T)=>z.object({activation:schema,latency:schema,crashes:schema,retention:schema,sessions:schema});
+export const configSchema=z.object({analysisMode:z.enum(analysisModeIds).default(defaultAnalysisMode),objective:z.string().trim().min(1).max(3000),requirements:z.string().max(5000),roles:metricMap(role),thresholds:metricMap(z.number().finite().min(0).max(100000))}).refine(c=>Object.values(c.roles).includes('target'),'Select at least one Target metric.');
+export const findingSchema=z.object({title:z.string(),body:z.string(),evidenceIds:z.array(z.string()),tone:z.enum(['positive','caution','neutral']),hypothesis:z.string(),validation:z.string()});
+export const reportSchema=z.object({shortTitle:z.string().min(1).max(48).describe('A concise 3–6 word summary of this report’s key finding or trade-off for navigation. Use a meaningful phrase, not the experiment name, rollout percentage, generic report label, or a truncated sentence.'),headline:z.string(),summary:z.string(),recommendation:z.enum(['iterate','ship','continue','stop']),findings:z.array(findingSchema),limitations:z.array(z.string())});
+export const responseSchema=z.object({report:reportSchema.nullable(),artifacts:z.array(z.object({title:z.string(),kind:z.enum(['trend','segments','comparison']),metricId,evidenceIds:z.array(z.string())})),suggestions:z.array(z.object({kind:z.enum(['branch','action']),title:z.string(),prompt:z.string(),evidenceIds:z.array(z.string())})),evidenceIds:z.array(z.string())});
+export const requestSchema=z.object({mode:z.enum(['analyze','chat']),pathContext:pathRequestSchema.optional(),experimentId:z.string().refine(id=>Object.hasOwn(datasetById,id),'Unknown experiment snapshot.'),snapshotId:z.string().min(1).max(100),branchId:z.string().min(1).max(100),runId:z.string().min(1).max(100),prompt:z.string().trim().min(1).max(8000),config:configSchema,context:z.string().max(8000),evidenceIds:z.array(z.string()).max(30),history:z.array(z.object({role:z.enum(['user','assistant']),text:z.string().max(16000)})).max(30)});

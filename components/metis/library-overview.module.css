@@ -1,0 +1,30 @@
+.overview { container-type: inline-size; display: grid; gap: 1rem; }
+.cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; }
+.metricCard { padding: 0; gap: 0; box-shadow: none; overflow: hidden; }
+.metricCard[data-active="true"] { border-color: var(--primary); }
+.metricButton { display: flex; flex: 1; flex-direction: column; width: 100%; height: 100%; padding: 1.125rem 1.25rem; text-align: left; cursor: pointer; transition: background 150ms; }
+.metricButton:hover { background: var(--muted); }
+.metricButton:focus-visible { outline: 2px solid var(--ring); outline-offset: -3px; border-radius: var(--radius); }
+.metricHeading { display: flex; align-items: center; justify-content: space-between; gap: .5rem; font-size: .875rem; font-weight: 500; }
+.metricHeading svg { width: 1rem; height: 1rem; color: var(--muted-foreground); }
+.metricValue { display: block; margin: .65rem 0 .4rem; font-size: 2rem; line-height: 1.1; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.035em; color: var(--metric-color, var(--foreground)); }
+.metricNote { display: block; font-size: .75rem; line-height: 1.5; color: var(--muted-foreground); }
+.distribution { gap: .85rem; padding: 1.125rem 1.25rem; box-shadow: none; }
+.distributionHeading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .4rem; }
+.chart { height: 1.75rem; width: 100%; aspect-ratio: auto; }
+.legend { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .4rem; }
+.legendButton { height: auto; min-width: 0; padding: .5rem; justify-content: flex-start; gap: .5rem; font-size: .875rem; }
+.legendButton[data-active="true"] { background: var(--secondary); }
+.legendLabel { min-width: 0; white-space: normal; text-align: left; }
+.legendValue { margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; }
+.dot { width: .5rem; height: .5rem; flex-shrink: 0; border-radius: 50%; background: var(--decision-color); }
+.decision { color: var(--decision-color); background: color-mix(in srgb, var(--decision-color) 9%, transparent); border-color: transparent; white-space: nowrap; font-size: .75rem; font-weight: 500; }
+.empty { padding: .4rem 0; font-size: .875rem; color: var(--muted-foreground); }
+@container (max-width: 740px) {
+  .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .legend { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container (max-width: 360px) {
+  .metricButton { padding: 1rem; }
+  .cards { gap: .65rem; }
+}

@@ -1,0 +1,108 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "../vendor/shadcn-tailwind-4.13.0.css";
+@plugin "@tailwindcss/typography";
+@font-face{font-family:'Inter Variable';font-style:normal;font-weight:100 900;font-display:swap;src:url('/fonts/inter-latin-variable.woff2') format('woff2')}
+
+
+/* Official prompt-kit light theme: ibelick/prompt-kit, app/globals.css. */
+:root {
+  color-scheme: light;
+  --background: hsl(0 0% 100%);
+  --foreground: hsl(240 10% 3.9%);
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(240 10% 3.9%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(240 10% 3.9%);
+  --primary: hsl(240 5.9% 10%);
+  --primary-foreground: hsl(0 0% 98%);
+  --secondary: hsl(240 4.8% 95.9%);
+  --secondary-foreground: hsl(240 5.9% 10%);
+  --muted: hsl(240 4.8% 95.9%);
+  --muted-foreground: hsl(240 3.8% 46.1%);
+  --accent: hsl(240 4.8% 95.9%);
+  --accent-foreground: hsl(240 5.9% 10%);
+  --destructive: hsl(0 84.2% 60.2%);
+  --destructive-foreground: hsl(0 0% 98%);
+  --border: hsl(240 5.9% 90%);
+  --input: hsl(240 5.9% 90%);
+  --ring: hsl(240 10% 3.9%);
+  /* Vuexy analytics palette; the prompt-kit interface keeps its neutral theme. */
+  --chart-1: #7367f0;
+  --chart-2: #808390;
+  --chart-3: #00bad1;
+  --chart-4: #28c76f;
+  --chart-5: #ff9f43;
+  --radius: 0.6rem;
+  --sidebar: hsl(0 0% 100%);
+  --sidebar-foreground: hsl(240 5.3% 26.1%);
+  --sidebar-primary: hsl(240 5.9% 10%);
+  --sidebar-primary-foreground: hsl(0 0% 98%);
+  --sidebar-accent: hsl(240 4.8% 95.9%);
+  --sidebar-accent-foreground: hsl(240 5.9% 10%);
+  --sidebar-border: hsl(220 13% 91%);
+  --sidebar-ring: hsl(217.2 91.2% 59.8%);
+}
+@theme inline{--color-background:var(--background);--color-foreground:var(--foreground);--color-card:var(--card);--color-card-foreground:var(--card-foreground);--color-popover:var(--popover);--color-popover-foreground:var(--popover-foreground);--color-primary:var(--primary);--color-primary-foreground:var(--primary-foreground);--color-secondary:var(--secondary);--color-secondary-foreground:var(--secondary-foreground);--color-muted:var(--muted);--color-muted-foreground:var(--muted-foreground);--color-accent:var(--accent);--color-accent-foreground:var(--accent-foreground);--color-destructive:var(--destructive);--color-border:var(--border);--color-input:var(--input);--color-ring:var(--ring);--color-chart-1:var(--chart-1);--color-chart-2:var(--chart-2);--color-chart-3:var(--chart-3);--color-chart-4:var(--chart-4);--color-chart-5:var(--chart-5);--color-sidebar:var(--sidebar);--color-sidebar-foreground:var(--sidebar-foreground);--color-sidebar-primary:var(--sidebar-primary);--color-sidebar-primary-foreground:var(--sidebar-primary-foreground);--color-sidebar-accent:var(--sidebar-accent);--color-sidebar-accent-foreground:var(--sidebar-accent-foreground);--color-sidebar-border:var(--sidebar-border);--color-sidebar-ring:var(--sidebar-ring);--radius-sm:calc(var(--radius) - 4px);--radius-md:calc(var(--radius) - 2px);--radius-lg:var(--radius);--radius-xl:calc(var(--radius) + 4px);--font-sans:'Inter Variable',Inter,Arial,sans-serif;--font-mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+@utility scrollbar-thin{scrollbar-width:thin}
+@utility scrollbar-none{scrollbar-width:none;&::-webkit-scrollbar{display:none}}
+@utility scrollbar-gutter-stable{scrollbar-gutter:stable}
+
+@layer base {
+  * { @apply border-border outline-ring/50; }
+  body { @apply bg-background text-foreground font-sans; }
+}
+
+/* Scoped to experiment visualizations, composed from shadcn and Recharts. */
+.metis-viz {
+  --viz-heading: #444050;
+  --viz-muted: #6d6b77;
+  --viz-border: #e6e6e8;
+  --viz-surface: #f8f7fa;
+  --viz-primary-soft: #e9e7fd;
+  --viz-positive: #187b45;
+  --viz-positive-soft: #ddf6e8;
+  --viz-negative: #bd4916;
+  --viz-negative-soft: #fff0e6;
+  --viz-caution: #995414;
+  --viz-caution-soft: #fff0e1;
+}
+.metis-viz.viz-card { min-width: 0; }
+.metis-viz.viz-stat [data-slot="card-title"] {
+  font-size: clamp(1.25rem, 2.5vw, 1.75rem);
+  letter-spacing: -.035em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.viz-table {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--viz-border);
+  border-radius: .5rem;
+  background: white;
+}
+.viz-table th {
+  height: 2.75rem;
+  padding-inline: 1rem;
+  background: var(--viz-surface);
+  color: var(--viz-muted);
+  font-size: .6875rem;
+  font-weight: 600;
+  letter-spacing: .055em;
+  text-transform: uppercase;
+}
+.viz-table td { padding: .875rem 1rem; }
+.viz-table tr { border-color: var(--viz-border); }
+.viz-table tbody tr:hover { background: #f8f7fa80; }
+/* Status colors convey metric direction; component primitives own the surface. */
+.viz-status[data-tone="positive"] { color: var(--viz-positive); background: var(--viz-positive-soft); }
+.viz-status[data-tone="caution"] { color: var(--viz-caution); background: var(--viz-caution-soft); }
+.viz-status[data-tone="negative"] { color: var(--viz-negative); background: var(--viz-negative-soft); }
+.case-signal[data-tone="positive"] { color: var(--viz-positive); }
+.case-signal[data-tone="negative"] { color: var(--viz-negative); }
+.case-signal[data-tone="neutral"] { color: var(--viz-muted); }
+.case-report { container-type: inline-size; }
+.case-metric-grid { display: grid; grid-template-columns: minmax(0,1fr); gap: 1rem; }
+.case-delta { font-size: clamp(1.5rem, 3cqi, 2rem); font-weight: 600; letter-spacing: -.04em; line-height: 1.2; }
+@container (min-width: 440px) { .case-metric-grid:not([data-columns="1"]) { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@container (min-width: 740px) { .case-metric-grid[data-columns="3"] { grid-template-columns: repeat(3,minmax(0,1fr)); } .case-overview .case-metric-grid[data-columns="4"] { grid-template-columns: repeat(4,minmax(0,1fr)); } }
