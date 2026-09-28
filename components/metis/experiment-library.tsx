@@ -1,16 +1,18 @@
 'use client';
 
 import { useState } from 'react';
-import { Search, X } from 'lucide-react';
+import { ChevronRight, Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { currentUserId, experimentOptions } from '@/lib/metis/experiment-catalog';
 import { datasetForUrl } from '@/lib/metis/datasets';
-import { decisionLabels, libraryDecision, matchesLibraryFilter, type LibraryFilter } from '@/lib/metis/library-overview';
+import { decisionLabels, matchesLibraryFilter, type LibraryFilter } from '@/lib/metis/library-overview';
+import { libraryPreview } from '@/lib/metis/library-preview';
 import { LibraryDecisionBadge, LibraryOverview } from './library-overview';
 import type { ExperimentDataset } from '@/lib/metis/types';
+import styles from './experiment-library.module.css';
 
 const groups = [...new Set(experimentOptions.map(experiment => experiment.group))];
 
@@ -70,34 +72,38 @@ export function ExperimentLibrary({ onAnalyze, busy, followedExperimentIds }: {
         </div>
         {status !== 'all' && <div className="flex items-center gap-2 text-sm"><span className="text-muted-foreground">Showing {status === 'completed' ? 'completed experiments' : decisionLabels[status].toLowerCase()}</span><Button variant="ghost" size="icon-sm" aria-label="Clear status filter" onClick={()=>setStatus('all')}><X/></Button></div>}
 
-        <Table>
-          <TableHeader><TableRow className="hover:bg-transparent">
-            <TableHead scope="col" className="pl-0 text-xs text-muted-foreground">Experiment</TableHead>
-            <TableHead scope="col" className="hidden text-xs text-muted-foreground lg:table-cell">Group</TableHead>
-            <TableHead scope="col" className="hidden text-xs text-muted-foreground sm:table-cell">Readout</TableHead>
-            <TableHead scope="col" className="pr-0"><span className="sr-only">Actions</span></TableHead>
+        <Table className={styles.table}>
+          <TableHeader className={styles.header}><TableRow className="hover:bg-transparent">
+            <TableHead scope="col" className={styles.experimentHeading}>Experiment</TableHead>
+            <TableHead scope="col" className={styles.readoutHeading}>Key readout</TableHead>
+            <TableHead scope="col" className={styles.actionHeading}><span className="sr-only">View analysis</span></TableHead>
           </TableRow></TableHeader>
           <TableBody>
             {experiments.map(experiment => {
               const data = datasetForUrl(experiment.url);
-              const decision = libraryDecision(data);
-              return <TableRow key={experiment.id} className={data && !busy ? 'cursor-pointer' : undefined} onClick={event=>{if(data&&!busy&&!(event.target as HTMLElement).closest('a,button'))onAnalyze(data);}}>
-                <TableCell className="max-w-0 py-5 pl-0">
-                  {data ? <a className="block truncate rounded-sm font-medium outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring" href={`/?experiment=${encodeURIComponent(experiment.id)}`} aria-disabled={busy} title={experiment.name} onClick={event=>{if(event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;event.preventDefault();if(!busy)onAnalyze(data);}}>{experiment.name}</a> : <p className="truncate font-medium" title={experiment.name}>{experiment.name}</p>}
-                  <p className="mt-1 truncate text-xs text-muted-foreground">{experiment.id} · {experiment.lifecycle === 'completed' ? 'Completed' : experiment.lifecycle === 'running' ? 'Running' : 'Status unknown'}</p>
-                  <p className="mt-1 text-xs text-muted-foreground lg:hidden">{experiment.group}</p>
-                  <div className="mt-2 sm:hidden"><LibraryDecisionBadge {...decision}/></div>
+              const preview = libraryPreview(data);
+              return <TableRow key={experiment.id} className={styles.row} data-interactive={Boolean(data && !busy)} onClick={event=>{if(data&&!busy&&!(event.target as HTMLElement).closest('a,button,[data-slot="badge"]'))onAnalyze(data);}}>
+                <TableCell className={styles.identity}>
+                  {data ? <a className={styles.name} href={`/?experiment=${encodeURIComponent(experiment.id)}`} aria-disabled={busy} onClick={event=>{if(event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;event.preventDefault();if(!busy)onAnalyze(data);}}>{experiment.name}</a> : <p className={styles.name}>{experiment.name}</p>}
+                  <p className={styles.lifecycle}>{experiment.lifecycle === 'completed' ? 'Completed' : experiment.lifecycle === 'running' ? 'Running' : 'Status unknown'}</p>
+                  {data && !data.caseStudy && <p className={styles.date}>Data through {data.experiment.end}</p>}
                 </TableCell>
-                <TableCell className="hidden w-[23%] text-muted-foreground lg:table-cell">{experiment.group}</TableCell>
-                <TableCell className="hidden w-[20%] sm:table-cell"><LibraryDecisionBadge {...decision}/><p className="mt-1 text-xs text-muted-foreground">{data ? data.caseStudy ? 'Source materials' : 'Demo snapshot' : 'Not connected'}</p></TableCell>
-                <TableCell className="w-24 pr-0">
-                  <div className="flex items-center justify-end">
-                    <Button variant="ghost" size="sm" disabled={!data || busy} aria-label={`Analyze ${experiment.name}`} title={!data ? 'Experiment data is not connected yet' : busy ? 'Loading your workspace' : `Open the analysis of ${experiment.name}`} onClick={()=>{if(data)onAnalyze(data);}}>Analyze</Button>
-                  </div>
+                <TableCell className={styles.readout}>
+                  <LibraryDecisionBadge {...preview.decision}/>
+                  <p className={styles.conclusion}>{preview.conclusion}</p>
+                  {preview.evidence.length > 0 && <div className={styles.evidence}>
+                    {preview.evidence.map(metric => <span className={styles.metric} key={metric.id}>
+                      <span>{metric.label}</span>{' '}<strong data-tone={metric.tone}>{metric.value}</strong>
+                      {metric.detail && <span className={styles.metricDetail}> · {metric.detail}</span>}
+                    </span>)}
+                  </div>}
+                </TableCell>
+                <TableCell className={styles.action}>
+                  <Button variant="ghost" size="icon-sm" disabled={!data || busy} aria-label={`View analysis for ${experiment.name}`} title={!data ? 'Experiment data is not connected yet' : busy ? 'Loading your workspace' : 'View analysis'} onClick={()=>{if(data)onAnalyze(data);}}><ChevronRight aria-hidden="true"/></Button>
                 </TableCell>
               </TableRow>;
             })}
-            {experiments.length === 0 && <TableRow className="hover:bg-transparent"><TableCell colSpan={4} className="py-16 text-center whitespace-normal"><Search aria-hidden="true" className="mx-auto mb-3 size-5 text-muted-foreground"/><p className="font-medium">{emptyScope && scope === 'followed' ? 'No followed experiments yet' : emptyScope && scope === 'mine' ? 'No experiments owned by you yet' : 'No experiments found'}</p><p className="mt-1 text-sm text-muted-foreground">{emptyScope ? 'Browse all experiments to find one to analyze.' : 'Try another name, ID, or group.'}</p><Button variant="outline" size="sm" className="mt-4" onClick={emptyScope ? ()=>setScope('all') : clearFilters}>{emptyScope ? 'Browse all experiments' : 'Clear filters'}</Button></TableCell></TableRow>}
+            {experiments.length === 0 && <TableRow className="hover:bg-transparent"><TableCell colSpan={3} className="py-16 text-center whitespace-normal"><Search aria-hidden="true" className="mx-auto mb-3 size-5 text-muted-foreground"/><p className="font-medium">{emptyScope && scope === 'followed' ? 'No followed experiments yet' : emptyScope && scope === 'mine' ? 'No experiments owned by you yet' : 'No experiments found'}</p><p className="mt-1 text-sm text-muted-foreground">{emptyScope ? 'Browse all experiments to find one to analyze.' : 'Try another name, ID, or group.'}</p><Button variant="outline" size="sm" className="mt-4" onClick={emptyScope ? ()=>setScope('all') : clearFilters}>{emptyScope ? 'Browse all experiments' : 'Clear filters'}</Button></TableCell></TableRow>}
           </TableBody>
         </Table>
         <div className="flex flex-col gap-1 border-t pt-4 text-xs leading-5 text-muted-foreground sm:flex-row sm:justify-between">

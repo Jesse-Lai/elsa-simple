@@ -1,0 +1,33 @@
+.table { table-layout: fixed; }
+.experimentHeading, .readoutHeading, .actionHeading { color: var(--muted-foreground); font-size: .875rem; }
+.experimentHeading { width: 30%; padding-left: 0; }
+.readoutHeading { padding-left: 1.5rem; }
+.actionHeading { width: 3rem; padding-right: 0; }
+.row[data-interactive="true"] { cursor: pointer; }
+.row:focus-within { background: var(--muted); }
+.identity, .readout, .action { padding-top: 1.5rem; padding-bottom: 1.5rem; white-space: normal; vertical-align: top; }
+.identity { padding-left: 0; padding-right: 1rem; }
+.name { display: block; width: fit-content; max-width: 100%; font-size: 1rem; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; border-radius: .2rem; }
+a.name:hover { text-decoration: underline; text-underline-offset: 3px; }
+a.name:focus-visible { outline: 2px solid var(--ring); outline-offset: 4px; }
+.lifecycle { margin-top: .4rem; font-size: .875rem; color: var(--muted-foreground); }
+.date { margin-top: .25rem; font-size: .75rem; color: var(--muted-foreground); }
+.readout { padding-left: 1.5rem; padding-right: 1rem; }
+.readout [data-slot="badge"] { font-size: .875rem; }
+.conclusion { margin-top: .5rem; font-size: 1rem; line-height: 1.5; text-wrap: pretty; }
+.evidence { display: flex; flex-wrap: wrap; gap: .35rem 1.25rem; margin-top: .6rem; font-size: .875rem; line-height: 1.6; color: var(--muted-foreground); }
+.metric strong { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--foreground); }
+.metric strong[data-tone="positive"] { color: #187b45; }
+.metric strong[data-tone="caution"] { color: #bd304a; }
+.metricDetail { font-size: .8125rem; }
+.action { padding-right: 0; text-align: right; vertical-align: middle; }
+@media (max-width: 760px) {
+  .header { display: none; }
+  .row { display: grid; grid-template-columns: minmax(0, 1fr) 2.5rem; padding: 1.25rem 0; }
+  .identity { grid-column: 1; padding: 0; }
+  .lifecycle, .date { display: inline-block; margin-top: .3rem; margin-right: .75rem; }
+  .readout { grid-column: 1 / -1; grid-row: 2; padding: .9rem 0 0; }
+  .action { grid-column: 2; grid-row: 1; padding: 0; align-self: start; }
+  .conclusion { margin-top: .5rem; }
+  .evidence { flex-direction: column; gap: .25rem; }
+}
