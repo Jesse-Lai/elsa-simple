@@ -1,6 +1,6 @@
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowUpRight, Check, Clipboard, Download, GitBranch, History, MoreHorizontal, PanelRightClose, PanelRightOpen, RotateCcw, Settings2 } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { ArrowLeft, ArrowUpRight, Check, Clipboard, Download, GitBranch, History, MoreHorizontal, RotateCcw, Settings2 } from 'lucide-react';
 import { toast, Toaster } from 'sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
@@ -23,8 +23,12 @@ import { getExperimentDemo } from '@/lib/metis/experiment-demos';
 import { Configuration } from './start';
 import { AssistantComposer, AssistantPanel, type Draft } from './assistant';
 import { CaseEvidenceDialog } from './case-evidence-dialog';
-import { ActionPlan, EvidenceView, ReportView } from './report';
-import { DecisionBadge, EvidenceChips } from './common';
+import { EvidenceView, ReportView } from './report';
+import { EvidenceChips } from './common';
+import { DesignIcon } from './design-assets';
+import { DesignAnalysisReport } from './design-analysis-report';
+import { DesignAnalysisLayout } from './design-analysis-layout';
+import { DesignComposer } from './design-composer';
 import { initialWorkspace } from '@/lib/metis/data';
 import { getDataset, seedWorkspace, sessionIdForExperiment } from '@/lib/metis/datasets';
 import { ExperimentDataProvider } from './experiment-data';
@@ -37,18 +41,29 @@ import { currentPathUpdates, downstreamPathNodes, isPathNode, validatePathResult
 import { userPathNodesSchema, removeUserPathNode, type UserPathNode } from '@/lib/metis/user-analysis-path';
 import { normalizeAnalysisConfig } from '@/lib/metis/analysis-modes';
 import { resolveSimpleView } from '@/lib/metis/simple-navigation';
+import { mockConversationReply } from '@/lib/metis/mock-conversation';
+import { useUserPreferences } from '@/hooks/use-user-preferences';
+import { UserSettings } from './user-settings';
+import { LibraryReportDetail } from './library-report-detail';
+import { libraryReports } from '@/lib/metis/library-reports';
+
+function subscribeReportLocation(onChange: () => void) {
+  window.addEventListener('popstate', onChange);
+  window.addEventListener('elsa-location-change', onChange);
+  return () => { window.removeEventListener('popstate', onChange); window.removeEventListener('elsa-location-change', onChange); };
+}
+function getReportLocation() { return new URLSearchParams(window.location.search).get('report'); }
+function notifyLocationChange() { window.dispatchEvent(new Event('elsa-location-change')); }
 
 const STORAGE_KEY='elsa-simple-workspace-v1';
-function ExperimentHeader({ name, caseTitle, library, home, panelOpen, onTogglePanel }: { name: string; caseTitle?: string; library: boolean; home: ()=>void; panelOpen: boolean; onTogglePanel?: ()=>void }) {
-  return <header className="flex min-h-16 shrink-0 items-center justify-between gap-3 border-b px-5 py-3 md:px-8">
-    <nav aria-label="Main navigation" className="flex min-w-0 items-center gap-3 md:gap-5">
-      <Button variant="ghost" className="h-auto shrink-0 px-0 text-xl font-semibold tracking-tight hover:bg-transparent" aria-label="ELSA — Experiment library" onClick={home}>ELSA</Button>
-      {!library&&<><Separator orientation="vertical" className="h-5!"/><Button variant="ghost" size="sm" className="shrink-0 gap-2 text-muted-foreground" onClick={home}><ArrowLeft/><span className="hidden sm:inline">Experiment library</span><span className="sm:hidden">Library</span></Button><span className="hidden truncate text-sm md:block">{name}</span></>}
+function ExperimentHeader({ name, library, home, connected, model }: { name: string; library: boolean; home: ()=>void; connected: boolean; model: string }) {
+  const preferences = useUserPreferences();
+  return <header className="flex h-16 min-h-16 shrink-0 items-center justify-between gap-6 border-b bg-white px-8">
+    <nav aria-label="Main navigation" className="flex min-w-0 items-center gap-6">
+      <Button variant="ghost" className="h-auto shrink-0 p-0 text-xl leading-7 font-semibold hover:bg-transparent" aria-label="ELSA — Experiment library" onClick={home}>ELSA</Button>
+      {!library && <><Separator orientation="vertical" className="h-5!"/><Button variant="ghost" className="h-8 w-4 shrink-0 p-0 hover:bg-transparent" aria-label="Back to experiment library" onClick={home}><DesignIcon file="841ab"/></Button><span className="truncate text-sm leading-5">{name}</span></>}
     </nav>
-    <div className="flex shrink-0 items-center gap-3">
-      {caseTitle&&<span className="hidden lg:block"><DecisionBadge status="warning">Hold at 5% · Do not expand</DecisionBadge></span>}
-      {onTogglePanel ? <Button id="toggle-workspace-panel" variant="ghost" size="icon-sm" aria-label={panelOpen ? 'Collapse workspace panel' : 'Expand workspace panel'} title={panelOpen ? 'Collapse panel' : 'Expand panel'} aria-expanded={panelOpen} aria-controls="experiment-workspace-panel" onClick={onTogglePanel}>{panelOpen ? <PanelRightClose/> : <PanelRightOpen/>}</Button> : <span className="flex size-8 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground" aria-label="Jesse Lai">JL</span>}
-    </div>
+    <UserSettings preferences={preferences} connected={connected} model={model}/>
   </header>;
 }
 type Busy={branchId:string;runId:string;messageId:string;mode:'chat'|'analyze';prompt:string;evidenceIds:string[];config:AnalysisConfig;pathNodeId?:string};
@@ -63,8 +78,12 @@ function configuredDemo(config:AnalysisConfig,dataset:ExperimentDataset){
   return report;
 }
 export function Workbench({initialExperimentId}:{initialExperimentId?:string}={}){
+  const preferences = useUserPreferences();
+  const reportId = useSyncExternalStore(subscribeReportLocation, getReportLocation, () => null);
+  const libraryReport = libraryReports.find(report => report.id === reportId);
   const [workspace,setWorkspace]=useState<Workspace>(()=>{return resolveSimpleView(seedWorkspace(initialWorkspace()),initialExperimentId);});const stateRef=useRef(workspace);stateRef.current=workspace;
-  const openLibrary=useCallback(()=>{if(window.location.pathname!=='/'||window.location.search)window.history.pushState(null,'','/');setWorkspace(s=>({...s,view:'library'}));},[]);
+  const openLibrary=useCallback(()=>{if(window.location.pathname!=='/'||window.location.search)window.history.pushState(null,'','/');notifyLocationChange();setWorkspace(s=>({...s,view:'library'}));},[]);
+  function openReport(id: string) { if (!libraryReports.some(report => report.id === id)) return; window.history.pushState(null, '', `/?report=${encodeURIComponent(id)}`); notifyLocationChange(); }
   const [loaded,setLoaded]=useState(false);const [connected,setConnected]=useState(false);const [model,setModel]=useState('gpt-5.6-terra');const [narrow,setNarrow]=useState(false);
   const [activeArtifacts,setActiveArtifacts]=useState<Record<string,string>>({});const returnReports=useRef<Record<string,string>>({});const [busy,setBusy]=useState<Busy|null>(null);const busyRef=useRef<Busy|null>(null);const abortRef=useRef<AbortController|null>(null);const [stage,setStage]=useState('');const [errors,setErrors]=useState<Record<string,string>>({});const retryRef=useRef<Busy|null>(null);
   const [draft,setDraft]=useState<Draft>({text:'',evidenceIds:[],nonce:0});const [settings,setSettings]=useState(false);const [setup,setSetup]=useState(false);const [history,setHistory]=useState(false);
@@ -76,9 +95,9 @@ export function Workbench({initialExperimentId}:{initialExperimentId?:string}={}
   const dataset=getDataset(branch.experimentId);
   const {experiment}=dataset;
   const experimentDemo=getExperimentDemo(experiment.id);
-  const panel=panels[branch.id]??{open:Boolean(experimentDemo)&&!narrow,tab:experimentDemo?'prototype':'conversation'};
+  const panel=panels[branch.id]??{open:experiment.id==='bebop-5pct'&&!narrow,tab:experimentDemo?preferences.defaultPanel:'conversation'};
   const chatOpen=panel.open&&panel.tab==='conversation';
-  const experimentName=workspace.view==='library' ? 'Experiment library' : experiment.name;
+  const experimentName=workspace.view==='library' ? 'Experiment library' : experiment.id==='bebop-5pct' ? 'Bebop design' : experiment.name;
   const lastReport=branch.artifacts.filter(a=>a.kind==='report').at(-1);const selected=activeArtifacts[branch.id]??lastReport?.id??'report';const artifact=branch.artifacts.find(a=>a.id===selected)??(selected==='report'?lastReport:undefined);
   const aiBusy=busy?.branchId===branch.id;
   const reportBranch = artifact?.kind === 'report' ? {...branch, config: artifact.config ?? branch.runs.find(r=>r.id===artifact.runId)?.config ?? branch.config} : branch;
@@ -88,7 +107,7 @@ export function Workbench({initialExperimentId}:{initialExperimentId?:string}={}
   useEffect(()=>{if(!loaded)return;const flush=()=>{try{localStorage.setItem(STORAGE_KEY,JSON.stringify(stateRef.current));}catch{/* The normal save path reports storage errors. */}};window.addEventListener('pagehide',flush);return()=>window.removeEventListener('pagehide',flush);},[loaded]);
   useEffect(()=>{const onPopState=()=>setWorkspace(s=>resolveSimpleView(s,window.location.pathname==='/cases/bebop-5pct'?'bebop-5pct':new URLSearchParams(window.location.search).get('experiment')));window.addEventListener('popstate',onPopState);return()=>window.removeEventListener('popstate',onPopState);},[]);
   const changeBranch=(id:string,fn:(b:AnalysisBranch)=>AnalysisBranch)=>setWorkspace(s=>updateBranch(s,id,fn));
-  function select(id:string){const target=stateRef.current.branches.find(b=>b.id===id);if(!target)return;const url=`/?experiment=${encodeURIComponent(target.experimentId)}`;if(window.location.pathname+window.location.search!==url)window.history.pushState(null,'',url);setArtifact('report',id);setWorkspace(s=>({...s,selectedBranchId:id,view:'workspace'}));setDraft({text:'',evidenceIds:[],nonce:0});}
+  function select(id:string){const target=stateRef.current.branches.find(b=>b.id===id);if(!target)return;const url=`/?experiment=${encodeURIComponent(target.experimentId)}`;if(window.location.pathname+window.location.search!==url)window.history.pushState(null,'',url);notifyLocationChange();setArtifact('report',id);setWorkspace(s=>({...s,selectedBranchId:id,view:'workspace'}));setDraft({text:'',evidenceIds:[],nonce:0});}
   function setArtifact(tab:string,id=branch.id){setActiveArtifacts(t=>({...t,[id]:tab}));}
   function openEvidence(id:string){if(dataset.caseStudy){setSourceEvidenceId(id);return;}if(!artifact||artifact.kind==='report')returnReports.current[branch.id]=artifact?.id??'report';const next=evidenceArtifact(id,getDataset(branch.experimentId));changeBranch(branch.id,b=>({...b,artifacts:b.artifacts.some(a=>a.id===next.id)?b.artifacts:[...b.artifacts,next]}));setArtifact(next.id);if(narrow)setPanelOpen(false);}
   function ask(text:string,evidenceIds:string[]){changeBranch(branch.id,b=>({...b,pathFocusId:undefined}));setDraft({text,evidenceIds:[...new Set(evidenceIds)],nonce:Date.now()});openChat();}
@@ -99,7 +118,7 @@ export function Workbench({initialExperimentId}:{initialExperimentId?:string}={}
     if(!text.trim())return;
     if(busyRef.current){toast('Wait for the current response or stop it first.');return;}
     openChat();
-    setDraft(d=>connected||pathNodeId?{text:'',evidenceIds:[],nonce:Date.now()}:{...d,nonce:Date.now()});
+    setDraft({text:'',evidenceIds:[],nonce:Date.now()});
     void run('chat',text.trim(),ids,undefined,branch.id,undefined,pathNodeId);
   }
   function submitPathComment(nodeId:string,comment:string){
@@ -125,13 +144,23 @@ export function Workbench({initialExperimentId}:{initialExperimentId?:string}={}
   }
   function proposeBranch(title='New analysis branch',context='',ids:string[]=[]){setBranchDialog({sourceId:branch.id,title,context,ids});}
   function saveBranch(){if(!branchDialog?.title.trim())return;setWorkspace(s=>{const source=s.branches.find(b=>b.id===branchDialog.sourceId)??s.branches[0];return createBranch(s,source,branchDialog.title,branchDialog.context,branchDialog.ids);});setBranchDialog(null);setDraft({text:'',evidenceIds:[],nonce:0});toast.success('Analysis branch created');}
-  function saveAction(finding:Finding){changeBranch(branch.id,b=>addAction(b,finding));toast.success('Added to the action plan below your report');}
+  function saveAction(finding:Finding){changeBranch(branch.id,b=>addAction(b,finding));toast.success('Action added');}
   function suggestion(s:AgentSuggestion){if(s.kind==='branch')proposeBranch(s.title,s.prompt,s.evidenceIds);else saveAction({title:s.title,body:s.prompt,hypothesis:'Validate this hypothesis against the experiment evidence.',validation:s.prompt,evidenceIds:s.evidenceIds,tone:'neutral'});}
   async function run(mode:'chat'|'analyze',prompt:string,ids:string[]=[],configOverride?:AnalysisConfig,branchId=branch.id,sourceOverride?:AnalysisBranch,pathNodeId?:string,retry=false){
     if(busyRef.current){toast('Wait for the current response or stop it first.');return;}
-    if(!connected&&!pathNodeId){setErrors(e=>({...e,[branchId]:'Live AI is not connected. Prepared reports are available; ask the site owner to enable AI for new questions and analyses.'}));openChat(branchId);return;}
     const source=sourceOverride??stateRef.current.branches.find(b=>b.id===branchId);if(!source)return;
     const config=structuredClone(configOverride??source.config);
+    if(!connected){
+      const data=getDataset(source.experimentId);
+      const runId=uid();
+      const reply=mockConversationReply(prompt,data,ids);
+      const report:Artifact|undefined=mode==='analyze'?{id:uid(),title:'Experiment report',kind:'report',metricId:'activation',evidenceIds:reply.evidenceIds,origin:'demo',runId,config,report:configuredDemo(config,data)}:undefined;
+      setErrors(e=>({...e,[branchId]:''}));
+      changeBranch(branchId,b=>({...b,messages:[...b.messages,...(mode==='chat'&&!retry?[{id:uid(),role:'user' as const,text:prompt,pathNodeId,evidenceIds:ids,origin:'user' as const,status:'complete' as const}]:[]),{id:uid(),role:'assistant',pathNodeId,...reply}],artifacts:report?[...b.artifacts,report]:b.artifacts,runs:[...b.runs,{id:runId,mode,startedAt:new Date().toISOString(),status:'complete',artifactIds:report?[report.id]:[],config}]}));
+      if(report)setArtifact(report.id,branchId);
+      openChat(branchId);
+      return;
+    }
     const job:Busy={branchId,mode,prompt,evidenceIds:ids,runId:uid(),messageId:uid(),config,pathNodeId};busyRef.current=job;setBusy(job);retryRef.current=job;setStage('Reading the experiment');setErrors(e=>({...e,[branchId]:''}));
     const startedAt=new Date().toISOString();
     changeBranch(branchId,b=>({...b,config:structuredClone(config),messages:[...b.messages,...(mode==='chat'&&!retry?[{id:uid(),role:'user' as const,text:prompt,pathNodeId,evidenceIds:ids,origin:'user' as const,status:'complete' as const}]:[]),{id:job.messageId,role:'assistant',text:'',pathNodeId,evidenceIds:[],origin:'ai',status:'incomplete'}],runs:[...b.runs,{id:job.runId,mode,startedAt,status:'running',artifactIds:[],config:structuredClone(config)}]}));
@@ -173,14 +202,13 @@ export function Workbench({initialExperimentId}:{initialExperimentId?:string}={}
   async function copy(){try{const reportArtifact=artifact?.kind==='report'?artifact:lastReport;const raw=reportArtifact?.report;const config=reportArtifact?.config??branch.runs.find(r=>r.id===reportArtifact?.runId)?.config??branch.config;const report=raw?reportReadout(raw,dataset,config,reportArtifact?.origin):undefined;await navigator.clipboard.writeText(`${experiment.name}\n${report?.headline??branch.name}\n${report?.summary??branch.context}\n\n${dataset.caseStudy?'Source-reported observations from supplied materials; no raw event data.':'Synthetic demonstration data.'}`);toast.success('Summary copied');}catch{toast.error('Clipboard access was unavailable. Export the report instead.');}}
   const composer=<AssistantComposer compact draft={draft} busy={Boolean(aiBusy)} onDraftChange={setDraft} onSend={sendChat} onStop={()=>abortRef.current?.abort()}/>;
   const assistant=<AssistantPanel branch={branch} connected={connected} busy={Boolean(aiBusy)} stage={stage} error={errors[branch.id]??''} draft={draft} onDraftChange={setDraft} active={chatOpen} onSend={sendChat} onStop={()=>abortRef.current?.abort()} onRetry={()=>{const retry=retryRef.current;if(retry?.branchId===branch.id)void run(retry.mode,retry.prompt,retry.evidenceIds,retry.config,retry.branchId,undefined,retry.pathNodeId,true);else void run('analyze','Analyze the experiment and recommend the next steps.');}} onEvidence={openEvidence} onSuggestion={suggestion} onReport={()=>{setArtifact(lastReport?.id??'report');if(narrow)setPanelOpen(false);}} onSetup={()=>setSetup(true)}/>;
-  const content=<ReportViewport scrollKey={`${branch.id}-${selected}`} composer={!chatOpen ? composer : null}>
+  const legacyContent=<ReportViewport scrollKey={`${branch.id}-${selected}`} composer={!chatOpen ? composer : null}>
     {aiBusy&&busy?.mode==='analyze'&&<Item variant="muted" role="status"><Spinner/><ItemContent><ItemTitle>{stage}</ItemTitle></ItemContent><ItemActions><Button variant="ghost" size="sm" onClick={()=>abortRef.current?.abort()}>Stop</Button></ItemActions></Item>}
     {artifact&&artifact.kind!=='report'?<>
       <div className="px-5 pt-5 md:px-8"><Button variant="ghost" size="sm" onClick={()=>setArtifact(returnReports.current[branch.id]??'report')}><ArrowLeft/>Back to report</Button></div>
       <EvidenceView artifact={artifact} onAsk={ask} onBranch={proposeBranch}/>
     </>:<>
       <ReportView branch={reportBranch} artifact={artifact} onEvidence={openEvidence} onAsk={ask} onBranch={proposeBranch} onAction={saveAction} onRun={()=>void run('analyze','Analyze this branch focus, respecting the inherited experiment configuration and evidence.')}/>
-      {branch.actions.length>0&&<ActionPlan branch={branch} onChange={action=>changeBranch(branch.id,b=>({...b,actions:b.actions.map(a=>a.id===action.id?action:a)}))} onEvidence={openEvidence}/>}
       {!dataset.caseStudy&&<div className="flex justify-end px-5 pb-6 md:px-8"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="sm" aria-label="Report options"><MoreHorizontal/>More</Button></DropdownMenuTrigger><DropdownMenuContent align="end" side="top">
         <DropdownMenuItem onSelect={copy}><Clipboard/>Copy summary</DropdownMenuItem>
         <DropdownMenuItem onSelect={download}><Download/>Export Markdown</DropdownMenuItem>
@@ -191,13 +219,17 @@ export function Workbench({initialExperimentId}:{initialExperimentId?:string}={}
       </DropdownMenuContent></DropdownMenu></div>}
     </>}
   </ReportViewport>;
+  const designReport = experiment.id === 'bebop-5pct' && (!artifact || artifact.kind === 'report');
+  const designContent = <DesignAnalysisReport onAsk={ask} onEvidence={openEvidence} data={dataset.caseStudy!} branch={branch} onAction={saveAction}/>;
   return <ExperimentDataProvider value={dataset}><PathDiscussionProvider value={{customNodes:branch.pathCustomNodes??[],saveNode:savePathNode,removeNode:removePathNode,revisions:branch.pathRevisions??[],busy:Boolean(busy),busyNodeId:aiBusy?busy?.pathNodeId:undefined,focusId:branch.pathFocusId,focus:id=>changeBranch(branch.id,b=>({...b,pathFocusId:id})),submit:submitPathComment}}><TooltipProvider><div className="flex h-dvh min-h-0 flex-col overflow-hidden">
     <WorkbenchLayout onContentResize={width=>setNarrow(width<940)}>
     <main className="flex h-dvh w-full min-w-0 flex-1 flex-col">
-      <ExperimentHeader name={experimentName} library={workspace.view==='library'} caseTitle={workspace.view==='workspace'?dataset.caseStudy?.title:undefined} home={openLibrary} panelOpen={panel.open} onTogglePanel={workspace.view==='workspace'?()=>setPanelOpen(!panel.open):undefined}/>
-      <div className={workspace.view==='library'?'flex min-h-0 flex-1 flex-col':'hidden'} hidden={workspace.view!=='library'}><ExperimentLibrary onAnalyze={data=>select(sessionIdForExperiment(data.experiment.id))} busy={!loaded} followedExperimentIds={Array.isArray(workspace.followedExperimentIds)?workspace.followedExperimentIds:[]}/></div>
-      {workspace.view==='library'?null:<>
-        <div className="min-h-0 min-w-0 flex-1"><WorkspacePanel key={branch.id} open={panel.open} activeTab={panel.tab} narrow={narrow} onOpenChange={setPanelOpen} onTabChange={setPanelTab} conversation={assistant} prototype={experimentDemo?<ExperimentDemoPanel demo={experimentDemo}/>:undefined}>{content}</WorkspacePanel></div>
+      <ExperimentHeader name={libraryReport?.title ?? experimentName} library={workspace.view==='library' && !libraryReport} home={openLibrary} connected={connected} model={model}/>
+      <div className={workspace.view==='library' && !libraryReport?'flex min-h-0 flex-1 flex-col':'hidden'} hidden={workspace.view!=='library' || Boolean(libraryReport)}><ExperimentLibrary active={workspace.view==='library' && !libraryReport} onReport={openReport} onAnalyze={data=>select(sessionIdForExperiment(data.experiment.id))} busy={!loaded} followedExperimentIds={Array.isArray(workspace.followedExperimentIds)?workspace.followedExperimentIds:[]}/></div>
+      {libraryReport ? <LibraryReportDetail key={libraryReport.id} report={libraryReport}/> : workspace.view==='library'?null:<>
+        {designReport ? <DesignAnalysisLayout open={panel.open} activeTab={panel.tab} narrow={narrow} onOpenChange={setPanelOpen} onTabChange={setPanelTab} conversation={assistant} composer={!chatOpen && <DesignComposer draft={draft} busy={Boolean(aiBusy)} onDraftChange={setDraft} onSend={sendChat}/>}>
+          {designContent}
+        </DesignAnalysisLayout> : <div className="relative min-h-0 min-w-0 flex-1"><Button id="toggle-workspace-panel" variant="ghost" className="absolute right-[38px] top-8 z-30 size-5 p-0 hover:bg-transparent" aria-label={panel.open ? 'Collapse workspace panel' : 'Expand workspace panel'} aria-expanded={panel.open} aria-controls="experiment-workspace-panel" onClick={()=>setPanelOpen(!panel.open)}><DesignIcon file="12a85"/></Button><WorkspacePanel key={branch.id} open={panel.open} activeTab={panel.tab} narrow={narrow} onOpenChange={setPanelOpen} onTabChange={setPanelTab} conversation={assistant} prototype={experimentDemo?<ExperimentDemoPanel demo={experimentDemo}/>:undefined}>{legacyContent}</WorkspacePanel></div>}
       </>}
     </main>
     </WorkbenchLayout>

@@ -3,15 +3,12 @@
 import { ChartColumn, Workflow } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { PromptSuggestion } from '@/components/prompt-kit/prompt-suggestion';
 import { useExperimentData } from './experiment-data';
 import { AnalysisPath } from './analysis-path';
 import { BebopInvestigation } from './bebop-investigation';
-import { CaseMetricVisual } from './case-metric-visual';
 import { ConclusionCard, ConclusionLabel } from './common';
 import { CaseDeltaChart, CaseCancellationChart } from './case-visualizations';
-import { caseDelta, caseRelative, caseValue, sourceEvidence } from '@/lib/metis/case-study';
-import { investigationMetric } from '@/lib/metis/bebop-investigation';
+import { caseDelta, caseRelative, caseValue } from '@/lib/metis/case-study';
 import type { CaseMetric } from '@/lib/metis/case-study-types';
 import type { AnalysisBranch, Artifact, Finding } from '@/lib/metis/types';
 
@@ -27,25 +24,16 @@ export function CaseStudyReport({branch,artifact,onEvidence,onAsk,onBranch,onAct
   const {caseStudy:data}=useExperimentData();
   if(!data)return null;
   const report=artifact?.report;
-  const metric=(id:string)=>data.metrics.find(m=>m.id===id)!;
-  const overviewMetrics=['message-dau','early-sat','zq-engagement','stop-generating'].map(id=>investigationMetric(metric(id)));
+  const headline='More ZQ engagement, but less sustained use. The cause remains unconfirmed.';
   return <article className="metis-viz case-report min-w-0 space-y-6 p-5 md:p-8">
     <ConclusionCard tone={artifact?.origin==='ai'&&report?.recommendation==='stop'?'negative':'mixed'}>
       <header className="space-y-3">
         <div className="space-y-1.5">
           <ConclusionLabel/>
-          <h1 className="text-2xl font-semibold leading-snug tracking-tight">{artifact?.origin==='ai' ? report?.headline??data.headline : data.headline}</h1>
+          <h1 className="text-2xl font-semibold leading-snug tracking-tight">{artifact?.origin==='ai' ? report?.headline??headline : headline}</h1>
         </div>
         {branch.parentId&&<p className="text-sm"><strong>Branch focus: </strong>{branch.context||branch.name}</p>}
       </header>
-      <section className="case-overview space-y-4" aria-label="Key experiment changes">
-        <div className="case-metric-grid" data-columns="4">{overviewMetrics.map(m=><CaseMetricVisual key={m.id} metric={m} onEvidence={onEvidence} compact/>)}</div>
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Suggested questions">
-          <PromptSuggestion size="sm" className="h-auto max-w-full whitespace-normal py-2 text-left" onClick={()=>onAsk('Why should Bebop stay at 5% instead of expanding?',['source:P1','source:P2','source:S07'])}>Why hold at 5%?</PromptSuggestion>
-          <PromptSuggestion size="sm" className="h-auto max-w-full whitespace-normal py-2 text-left" onClick={()=>onAsk('Why is cancellation rising in both ZQ and non-ZQ, and what remains unknown?',['segment:crashes','source:S05'])}>Why is cancellation rising?</PromptSuggestion>
-          <PromptSuggestion size="sm" className="h-auto max-w-full whitespace-normal py-2 text-left" onClick={()=>onAsk('What should we validate next before expanding Bebop?',sourceEvidence(data.plans.flatMap(plan=>plan.sourceIds)))}>What should we validate next?</PromptSuggestion>
-        </div>
-      </section>
     </ConclusionCard>
     <Tabs defaultValue="findings" className="min-w-0 gap-6">
       <TabsList aria-label="Analysis views" className="grid w-full grid-cols-2 gap-3 bg-transparent p-0 group-data-[orientation=horizontal]/tabs:h-auto">

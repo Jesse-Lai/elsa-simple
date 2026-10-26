@@ -1,15 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { registerHooks } from 'node:module';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { bebopCase, bebopDataset } from '../lib/metis/bebop-case';
-import { bebopContext, investigationMetric } from '../lib/metis/bebop-investigation';
+import { bebopContext, investigationMetric, metricPeriod } from '../lib/metis/bebop-investigation';
 import { caseDelta, caseRelative, caseSignal } from '../lib/metis/case-study';
 import { caseDeltaPoints } from '../lib/metis/case-chart-data';
 import { initialWorkspace } from '../lib/metis/data';
 import { seedWorkspace } from '../lib/metis/datasets';
 import { ExperimentDataProvider } from '../components/metis/experiment-data';
-import { CaseStudyReport } from '../components/metis/case-study-report';
+
+// Node's renderer checks semantics and values; Vite handles CSS in the browser.
+const cssHook = registerHooks({ load(url, context, nextLoad) {
+  if (url.endsWith('.module.css')) return { format: 'module', shortCircuit: true, source: 'export default new Proxy({}, { get: (_, key) => String(key) });' };
+  return nextLoad(url, context);
+} });
+const { CaseStudyReport } = await import('../components/metis/case-study-report');
+cssHook.deregister();
 
 test('the report opens on the complete Findings homepage while Analysis path remains a separate view', () => {
   const branch = seedWorkspace(initialWorkspace()).branches.find(item => item.experimentId === bebopCase.id)!;
@@ -19,8 +27,37 @@ test('the report opens on the complete Findings homepage while Analysis path rem
   })));
   assert.match(html.replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/g, ''), /<button[^>]*role="tab"[^>]*aria-selected="true"[^>]*>Findings<\/button>/);
   assert.match(html.replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/g, ''), /<button[^>]*role="tab"[^>]*aria-selected="false"[^>]*>Analysis path<\/button>/);
-  for (const text of ['Stage 01:', 'Stage 02:', 'Stage 03:', 'Thumbs-down rate', '2-day engagement', 'Observed Web and Work query shares', 'Test queued prompt', 'Removing Web/Work switching creates task mismatch']) assert.ok(html.includes(text), text);
+  const sections = ['Experiment checks', 'Metric comparison', 'Detailed analysis', 'Findings &amp; next steps'];
+  const positions = sections.map(title => html.indexOf(`aria-label="${title}"`));
+  assert.ok(positions.every((position, index) => position >= 0 && (index === 0 || position > positions[index - 1])));
+  for (const text of ['Control 47,033 users, Treatment 47,844 users', 'Control 18.65%, Treatment 18.18%', 'Control 83.45%, Treatment 79.11%', 'Control 2.33%, Treatment 6.27%', 'Add measurement audit', 'Unverified hypothesis', 'Metric to investigate', 'Daily trend', 'User cohorts', 'Countries', 'Related metrics', 'Illustrative data']) assert.ok(html.includes(text), text);
+  assert.equal((html.match(/data-comparison=/g) ?? []).length, 4);
+  assert.equal((html.match(/data-horizontal-comparison=/g) ?? []).length, 5);
+  assert.equal((html.match(/data-group="Control"/g) ?? []).length, 5);
+  assert.equal((html.match(/data-group="Treatment"/g) ?? []).length, 5);
+  assert.equal((html.match(/data-finding-chain=/g) ?? []).length, 3);
+  const confirmed = html.slice(html.indexOf('aria-label="Confirmed findings"'), html.indexOf('class="connectionHead"'));
+  assert.equal((confirmed.match(/data-status="observed"/g) ?? []).length, 2);
+  assert.doesNotMatch(confirmed, /<button|Next action/);
+  assert.equal((html.match(/data-hypothesis=/g) ?? []).length, 5);
+  for (const action of ['Add ZQ test', 'Add switch test', 'Add feedback test', 'Add queued-prompt test', 'Add measurement audit']) assert.ok(html.includes(action), action);
+  assert.doesNotMatch(html, /aria-label="Global impact"/);
+  const detail = html.slice(html.indexOf('aria-label="Metric breakdown"'), html.indexOf('aria-label="Findings &amp; next steps"'));
+  assert.doesNotMatch(detail, /data-comparison=|Control \d|Treatment \d|Early scorecard|Follow-up review/);
+  assert.match(detail, /data-selected-group="treatment"/);
+  assert.match(detail, /Day 1–7 · Illustrative data/);
+  assert.doesNotMatch(html, /Stage 0[123]:|Key experiment changes|case-metric-grid|Metric changes relative to Control/);
   assert.doesNotMatch(html, />Hypotheses &amp; plans<|>Data &amp; sources</);
+});
+
+test('comparison labels preserve source windows instead of treating snapshots as a daily series', () => {
+  const get = (id: string) => bebopCase.metrics.find(m => m.id === id)!;
+  assert.equal(metricPeriod(get('early-sat')), 'Mar 31–Apr 4');
+  assert.equal(metricPeriod(get('message-dau')), 'Mar 31–Apr 12');
+  assert.equal(metricPeriod(get('active-sessions')), 'Mar 31–Apr 11');
+  assert.equal(metricPeriod(get('chat-retained')), 'Window unspecified');
+  assert.deepEqual(bebopDataset.trends, {});
+  assert.deepEqual(bebopDataset.segments, []);
 });
 
 test('investigation charts normalize ratios without changing source measurements or their windows', () => {

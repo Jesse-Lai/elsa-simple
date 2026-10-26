@@ -29,7 +29,7 @@ export function MetricComparisonBars({ metric, compact = false }: { metric: Comp
   const domain = comparisonBarDomain(metric);
   const points = [{ name: 'Control', value: metric.control, fill: 'var(--chart-2)' }, { name: 'Treatment', value: metric.treatment, fill: color(metric.tone) }];
   return <figure className={compact ? "min-w-0" : "min-w-0 border-t pt-3"} aria-label={`${metric.name}: Control ${comparisonValue(metric, metric.control)}, Treatment ${comparisonValue(metric, metric.treatment)}. Bar scale ${comparisonValue(metric, 0)} to ${comparisonValue(metric, domain[1])}.`}>
-    <ChartContainer className="metis-viz h-28 w-full aspect-auto" config={{ value: { label: metric.name } }}>
+    <ChartContainer className="metis-viz h-20 w-full aspect-auto" config={{ value: { label: metric.name } }}>
       <BarChart accessibilityLayer layout="vertical" data={points} margin={{ left: 0, right: metric.unit === '%' ? 52 : 72, top: 4, bottom: 0 }}>
         <CartesianGrid horizontal={false} stroke="var(--border)" strokeDasharray="3 5"/>
         <XAxis type="number" domain={domain} ticks={domain} tickFormatter={value => comparisonValue(metric, value)} axisLine={false} tickLine={false} tickMargin={7} height={24} fontSize={10}/>

@@ -1,0 +1,11 @@
+/* Blend the embedded canvas into the host panel without a rectangular edge. */
+html,
+body,
+#root > div {
+  background: transparent !important;
+}
+
+/* Keep the device shadow inside the iframe's available transparent margin. */
+:root {
+  --filter-phone-frame: drop-shadow(0 0 0.75px #929292) drop-shadow(0 14px 24px #00000026) !important;
+}

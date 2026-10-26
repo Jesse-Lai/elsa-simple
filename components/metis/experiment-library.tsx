@@ -1,116 +1,151 @@
 'use client';
 
-import { useState } from 'react';
-import { ChevronRight, Search, X } from 'lucide-react';
+import { useMemo, useState, useSyncExternalStore } from 'react';
+import { ArrowRepeatAll16Regular, Warning16Regular, Star16Filled, Star16Regular } from '@fluentui/react-icons';
 import { Button } from '@/components/ui/button';
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { currentUserId, experimentOptions } from '@/lib/metis/experiment-catalog';
+import { experimentOptions, currentUserId } from '@/lib/metis/experiment-catalog';
 import { datasetForUrl } from '@/lib/metis/datasets';
-import { decisionLabels, matchesLibraryFilter, type LibraryFilter } from '@/lib/metis/library-overview';
-import { libraryPreview } from '@/lib/metis/library-preview';
-import { LibraryDecisionBadge, LibraryOverview } from './library-overview';
 import type { ExperimentDataset } from '@/lib/metis/types';
+import { DesignIcon } from './design-assets';
+import { libraryReports } from '@/lib/metis/library-reports';
 import styles from './experiment-library.module.css';
+import { LibraryConversation } from './library-conversation';
 
-const groups = [...new Set(experimentOptions.map(experiment => experiment.group))];
+// Presentation fixtures from frame 151:483, including its duplicate last row.
+// Catalog snapshots and their analytical values are not modified by these labels.
+const rows = [
+  { key: 'onboarding', id: 'onboarding-refresh', name: 'Onboarding refresh', assessment: 'Needs attention', stage: '50%WW', progress: 49.78 },
+  { key: 'checkout', id: 'checkout-simplification', name: 'Checkout simplification', assessment: 'Ready to ship', stage: '80%WW', progress: 79.31 },
+  { key: 'bebop', id: 'bebop-5pct', name: 'Bebop design', assessment: 'Don’t expand rollout', stage: '5%WW', progress: 16.95 },
+  { key: 'search', id: 'search-relevance', name: 'Search relevance', assessment: '', stage: 'MSIT', progress: 9.77 },
+  { key: 'pricing', id: 'pricing-page-refresh', name: 'Pricing page refresh', assessment: '', stage: 'SDFv2', progress: 4.02 },
+  { key: 'pricing-copy', id: 'pricing-page-refresh', name: 'Pricing page refresh', assessment: '', stage: 'SDFv2', progress: 4.02 },
+];
+const groups = [...new Set(experimentOptions.map(item => item.group))];
+const starStorage = 'elsa-design-library-stars-v1';
+let memoryStars: string | null = null;
+function getStarSnapshot() { try { return localStorage.getItem(starStorage); } catch { return memoryStars; } }
+function saveStars(stars: string[]) {
+  memoryStars = JSON.stringify(stars);
+  try { localStorage.setItem(starStorage, memoryStars); } catch { /* The in-memory snapshot remains usable. */ }
+  window.dispatchEvent(new Event('elsa-library-stars'));
+}
+function subscribeToStars(onChange: () => void) {
+  window.addEventListener('storage', onChange);
+  window.addEventListener('elsa-library-stars', onChange);
+  return () => { window.removeEventListener('storage', onChange); window.removeEventListener('elsa-library-stars', onChange); };
+}
 
-export function ExperimentLibrary({ onAnalyze, busy, followedExperimentIds }: {
+
+function Filter({ label, name, value, onChange, options, disabled = false }: {label: string; name: string; value: string; onChange: (value: string) => void; options: string[]; disabled?: boolean}) {
+  return <Select value={value} onValueChange={onChange} disabled={disabled}>
+    <SelectTrigger aria-label={name} className={styles.filter}><SelectValue/><DesignIcon file="da3a2" /></SelectTrigger>
+    <SelectContent position="popper" align="start"><SelectItem value="all">{label}</SelectItem>{options.map(option => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent>
+  </Select>;
+}
+
+export function ExperimentLibrary({ onAnalyze, onReport, busy, active = true }: {
   onAnalyze: (dataset: ExperimentDataset) => void;
+  onReport: (id: string) => void;
   busy: boolean;
+  active?: boolean;
   followedExperimentIds: string[];
 }) {
   const [query, setQuery] = useState('');
+  const [status, setStatus] = useState('all');
+  const [entity, setEntity] = useState('all');
   const [group, setGroup] = useState('all');
-  const [scope, setScope] = useState('all');
-  const [status, setStatus] = useState<LibraryFilter>('all');
-  const search = query.trim().toLowerCase();
-  const scopedExperiments = experimentOptions.filter(experiment =>
-    scope === 'mine' ? experiment.ownerId === currentUserId :
-    scope === 'followed' ? followedExperimentIds.includes(experiment.id) : true);
-  const matchedExperiments = scopedExperiments.filter(experiment =>
-    (group === 'all' || experiment.group === group) &&
-    `${experiment.name} ${experiment.id} ${experiment.group}`.toLowerCase().includes(search));
-  const experiments = matchedExperiments.filter(experiment => matchesLibraryFilter(experiment, status));
-  const filtered = Boolean(search) || group !== 'all' || status !== 'all';
-  function clearFilters() { setQuery(''); setGroup('all'); setStatus('all'); }
-  const emptyScope = !filtered && scopedExperiments.length === 0;
-
-  return <section className="min-h-0 flex-1 overflow-y-auto px-5 py-8 md:px-10 md:py-12" aria-labelledby="experiment-library-title">
-    <div className="mx-auto max-w-6xl space-y-8">
-      <div className="space-y-2">
-        <h1 id="experiment-library-title" className="text-3xl font-semibold tracking-tight">Experiment library</h1>
-        <p className="text-sm leading-6 text-muted-foreground">All experiments you have access to. Pick one to start an analysis.</p>
-      </div>
-
-      <LibraryOverview experiments={matchedExperiments} filter={status} onFilter={setStatus}/>
-
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <InputGroup className="h-10 w-full shadow-none sm:w-auto sm:min-w-52 sm:max-w-sm sm:flex-1">
-            <InputGroupInput aria-label="Search experiments" placeholder="Search experiments…" value={query} onChange={event=>setQuery(event.target.value)}/>
-            <InputGroupAddon><Search aria-hidden="true"/></InputGroupAddon>
-            {query && <InputGroupAddon align="inline-end"><InputGroupButton size="icon-xs" aria-label="Clear search" onClick={()=>setQuery('')}><X/></InputGroupButton></InputGroupAddon>}
-          </InputGroup>
-          <Select value={scope} onValueChange={value=>{setScope(value);setStatus('all');}}>
-            <SelectTrigger aria-label="Filter experiments" className="w-44 bg-background shadow-none data-[size=default]:h-10"><SelectValue/></SelectTrigger>
-            <SelectContent position="popper" align="start">
-              <SelectItem value="all">All experiments</SelectItem>
-              <SelectItem value="mine">My experiments</SelectItem>
-              <SelectItem value="followed">Followed</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={group} onValueChange={setGroup}>
-            <SelectTrigger aria-label="Filter by group" className="w-40 bg-background shadow-none data-[size=default]:h-10 sm:w-48"><SelectValue/></SelectTrigger>
-            <SelectContent position="popper" align="start">
-              <SelectItem value="all">All groups</SelectItem>
-              {groups.map(name=><SelectItem key={name} value={name}>{name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <p role="status" className="text-xs whitespace-nowrap text-muted-foreground sm:ml-auto">{filtered ? `${experiments.length} of ${scopedExperiments.length}` : scopedExperiments.length} {scopedExperiments.length === 1 ? 'experiment' : 'experiments'}</p>
-        </div>
-        {status !== 'all' && <div className="flex items-center gap-2 text-sm"><span className="text-muted-foreground">Showing {status === 'completed' ? 'completed experiments' : decisionLabels[status].toLowerCase()}</span><Button variant="ghost" size="icon-sm" aria-label="Clear status filter" onClick={()=>setStatus('all')}><X/></Button></div>}
-
-        <Table className={styles.table}>
-          <TableHeader className={styles.header}><TableRow className="hover:bg-transparent">
-            <TableHead scope="col" className={styles.experimentHeading}>Experiment</TableHead>
-            <TableHead scope="col" className={styles.readoutHeading}>Key readout</TableHead>
-            <TableHead scope="col" className={styles.actionHeading}><span className="sr-only">View analysis</span></TableHead>
-          </TableRow></TableHeader>
-          <TableBody>
-            {experiments.map(experiment => {
-              const data = datasetForUrl(experiment.url);
-              const preview = libraryPreview(data);
-              return <TableRow key={experiment.id} className={styles.row} data-interactive={Boolean(data && !busy)} onClick={event=>{if(data&&!busy&&!(event.target as HTMLElement).closest('a,button,[data-slot="badge"]'))onAnalyze(data);}}>
-                <TableCell className={styles.identity}>
-                  {data ? <a className={styles.name} href={`/?experiment=${encodeURIComponent(experiment.id)}`} aria-disabled={busy} onClick={event=>{if(event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;event.preventDefault();if(!busy)onAnalyze(data);}}>{experiment.name}</a> : <p className={styles.name}>{experiment.name}</p>}
-                  <p className={styles.lifecycle}>{experiment.lifecycle === 'completed' ? 'Completed' : experiment.lifecycle === 'running' ? 'Running' : 'Status unknown'}</p>
-                  {data && !data.caseStudy && <p className={styles.date}>Data through {data.experiment.end}</p>}
-                </TableCell>
-                <TableCell className={styles.readout}>
-                  <LibraryDecisionBadge {...preview.decision}/>
-                  <p className={styles.conclusion}>{preview.conclusion}</p>
-                  {preview.evidence.length > 0 && <div className={styles.evidence}>
-                    {preview.evidence.map(metric => <span className={styles.metric} key={metric.id}>
-                      <span>{metric.label}</span>{' '}<strong data-tone={metric.tone}>{metric.value}</strong>
-                      {metric.detail && <span className={styles.metricDetail}> · {metric.detail}</span>}
-                    </span>)}
-                  </div>}
-                </TableCell>
-                <TableCell className={styles.action}>
-                  <Button variant="ghost" size="icon-sm" disabled={!data || busy} aria-label={`View analysis for ${experiment.name}`} title={!data ? 'Experiment data is not connected yet' : busy ? 'Loading your workspace' : 'View analysis'} onClick={()=>{if(data)onAnalyze(data);}}><ChevronRight aria-hidden="true"/></Button>
-                </TableCell>
-              </TableRow>;
-            })}
-            {experiments.length === 0 && <TableRow className="hover:bg-transparent"><TableCell colSpan={3} className="py-16 text-center whitespace-normal"><Search aria-hidden="true" className="mx-auto mb-3 size-5 text-muted-foreground"/><p className="font-medium">{emptyScope && scope === 'followed' ? 'No followed experiments yet' : emptyScope && scope === 'mine' ? 'No experiments owned by you yet' : 'No experiments found'}</p><p className="mt-1 text-sm text-muted-foreground">{emptyScope ? 'Browse all experiments to find one to analyze.' : 'Try another name, ID, or group.'}</p><Button variant="outline" size="sm" className="mt-4" onClick={emptyScope ? ()=>setScope('all') : clearFilters}>{emptyScope ? 'Browse all experiments' : 'Clear filters'}</Button></TableCell></TableRow>}
-          </TableBody>
-        </Table>
-        <div className="flex flex-col gap-1 border-t pt-4 text-xs leading-5 text-muted-foreground sm:flex-row sm:justify-between">
-          <p>Your analysis is saved automatically as you work.</p>
-          <p>Sample catalog & lifecycle · Live platform not connected</p>
+  const [owner, setOwner] = useState('all');
+  const [starFilter, setStarFilter] = useState('all');
+  const [contentType, setContentType] = useState('all');
+  function changeContentType(value: string) {
+    setContentType(value);
+    if (value === 'Reports') {
+      setStatus('all'); setEntity('all'); setGroup('all'); setOwner('all'); setStarFilter('all');
+    }
+  }
+  const starSnapshot = useSyncExternalStore(subscribeToStars, getStarSnapshot, () => null);
+  const stars = useMemo<string[]>(() => {
+    try { const saved = JSON.parse(starSnapshot ?? 'null'); if (Array.isArray(saved) && saved.every(id => typeof id === 'string')) return saved; } catch { /* Keep the design defaults for malformed storage. */ }
+    return rows.map(row => row.id);
+  }, [starSnapshot]);
+  function toggleStar(id: string) {
+    const next = stars.includes(id) ? stars.filter(item => item !== id) : [...stars, id];
+    saveStars(next);
+  }
+  const experiments = rows.filter(row => {
+    const catalog = experimentOptions.find(item => item.id === row.id);
+    return contentType !== 'Reports' && `${row.name} ${row.id}`.toLowerCase().includes(query.trim().toLowerCase()) &&
+      (status === 'all' || status === 'Running' || status === row.assessment) &&
+      (entity === 'all' || entity === catalog?.group) && (group === 'all' || group === catalog?.group) &&
+      (owner === 'all' || (owner === 'My experiments' ? catalog?.ownerId === currentUserId : catalog?.ownerId !== currentUserId)) &&
+      (starFilter === 'all' || (starFilter === 'Starred only' ? stars.includes(row.id) : !stars.includes(row.id)));
+  });
+  const reports = libraryReports.filter(report => contentType !== 'Experiments' &&
+    `${report.title} ${report.summary}`.toLowerCase().includes(query.trim().toLowerCase()) &&
+    status === 'all' && entity === 'all' && group === 'all' && owner === 'all' && starFilter !== 'Starred only');
+  return <section className={styles.library} aria-labelledby="experiment-library-title" data-node-id="151:485">
+    <div className={styles.layout}>
+    <div className={styles.content}>
+      <div className={styles.overview}>
+        <div className={styles.heading}><h1 id="experiment-library-title">Experiment library</h1><p>Browse experiments and reports you have access to.</p></div>
+        <div className={styles.summary}>
+          <div className={styles.stat}><div><span>Total experiments</span><DesignIcon file="b3d3f"/></div><strong>8</strong></div>
+          <div className={styles.stat}><div><span>Running</span><ArrowRepeatAll16Regular aria-hidden="true"/></div><strong>3</strong></div>
+          <div className={styles.stat}><div><span>Needs attention</span><Warning16Regular aria-hidden="true" className={styles.attentionIcon}/></div><strong className={styles.attention}>2</strong></div>
+          <div className={styles.stat}><div><span>Completed</span><DesignIcon file="39bc5"/></div><strong>4</strong></div>
         </div>
       </div>
+      <div className={styles.list}>
+        <div className={styles.filters}>
+          <div className={styles.search}><DesignIcon file="29ba2"/><Input aria-label="Search experiments and reports" placeholder="Search experiments and reports…" value={query} onChange={event => setQuery(event.target.value)}/></div>
+          <Filter name="Filter by status" label="All status" value={status} onChange={setStatus} options={['Running', 'Needs attention', 'Ready to ship', 'Don’t expand rollout']} disabled={contentType === 'Reports'}/>
+          <Filter name="Filter by entity type" label="Entity type" value={entity} onChange={setEntity} options={groups} disabled={contentType === 'Reports'}/>
+          <Filter name="Filter by entity group" label="Entity type" value={group} onChange={setGroup} options={groups} disabled={contentType === 'Reports'}/>
+          <Filter name="Filter by owner" label="Owners" value={owner} onChange={setOwner} options={['My experiments', 'Other owners']} disabled={contentType === 'Reports'}/>
+          <Filter name="Filter by starred" label="Starred" value={starFilter} onChange={setStarFilter} options={['Starred only', 'Not starred']} disabled={contentType === 'Reports'}/>
+          <Filter name="Filter by content type" label="All data" value={contentType} onChange={changeContentType} options={['Reports', 'Experiments']}/>
+        </div>
+        <div className={styles.rows}>
+          {experiments.map(row => {
+            const catalog = experimentOptions.find(item => item.id === row.id);
+            const dataset = catalog ? datasetForUrl(catalog.url) : undefined;
+            const starred = stars.includes(row.id);
+            const attention = row.assessment === 'Needs attention';
+            const open = () => { if (dataset && !busy) onAnalyze(dataset); };
+            return <article key={row.key} className={styles.row} onClick={event => { if (!(event.target as HTMLElement).closest('button,a')) open(); }} data-interactive={Boolean(dataset)}>
+              <div className={styles.identity}>
+                <div className={styles.nameRow}>
+                  {dataset ? <a className={styles.name} href={`/?experiment=${row.id}`} onClick={event => { if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return; event.preventDefault(); open(); }}>{row.name}</a> : <h2 className={styles.name}>{row.name}</h2>}
+                  <Button variant="ghost" className={styles.star} aria-label={`${starred ? 'Unstar' : 'Star'} ${row.name}`} aria-pressed={starred} onClick={() => toggleStar(row.id)}>{starred ? <Star16Filled/> : <Star16Regular/>}</Button>
+                </div>
+                <p className={styles.date}>Started on Sep 14, 2026</p>
+              </div>
+              <div className={styles.readout}>
+                <div className={styles.status}>Running{row.assessment && <span className={styles.badge} data-attention={attention} data-rollout-held={row.assessment === 'Don’t expand rollout'}>{row.assessment}</span>}</div>
+                <div className={styles.rollout}><p>{row.stage}</p><div className={styles.track}><div style={{width: `${row.progress}%`}} data-early={row.stage === 'MSIT' || row.stage === 'SDFv2'}/></div></div>
+                <p className={styles.metrics} data-attention={attention}>Activation rate <strong>{attention ? '-0.47 pp' : '+0.5 pp'}</strong>{'     '}Onboarding latency <strong>+64 ms</strong></p>
+              </div>
+            </article>;
+          })}
+          {reports.length > 0 && <section className={styles.reports} aria-labelledby="library-reports-title">
+            <h2 id="library-reports-title">Reports</h2>
+            {reports.map(report => <a key={report.id} href={`/?report=${report.id}`} className={styles.reportCard} onClick={event => { if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return; event.preventDefault(); onReport(report.id); }}>
+              {/* The thumbnail is the source image exported for this exact Figma card. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={report.image} alt="" width={161} height={110}/>
+              <span className={styles.reportCopy}><span><strong>{report.title}</strong><small>Started on {report.date}</small></span><span>{report.summary}</span></span>
+            </a>)}
+          </section>}
+          {experiments.length === 0 && reports.length === 0 && <p className={styles.empty} role="status">{contentType === 'Reports' ? 'No reports found' : contentType === 'Experiments' ? 'No experiments found' : 'No experiments or reports found'}</p>}
+        </div>
+      </div>
+    </div>
+    <div className={styles.conversation}>
+      <LibraryConversation experiments={rows} active={active} onExperiment={id => { const catalog = experimentOptions.find(item => item.id === id); const dataset = catalog && datasetForUrl(catalog.url); if (dataset && !busy) onAnalyze(dataset); }} onReport={onReport}/>
+    </div>
     </div>
   </section>;
 }

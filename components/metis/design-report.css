@@ -1,0 +1,38 @@
+/* Frame geometry uses the existing Inter font and shadcn color tokens. */
+.design-report { max-width:calc(var(--experiment-content-width) + 64px); }
+.design-report { container-type: inline-size; --radius-4: 4px; --radius-8: 8px; --radius-14: 14px; --radius-16: 16px; --positive: #187b45; --positive-soft: #ddf6e8; --attention: #bd304a; --adverse: #bd4916; --caution: #995414; --caution-soft: #fff0e1; --control: #808390; }
+.design-report img { flex-shrink: 0; }
+/* Resize the track independently so the milestone stays circular. */
+.design-report .rollout-progress { position: relative; width: 100%; height: 16px; flex-shrink: 0; }
+.design-report .rollout-progress-track { position: absolute; top: 5px; width: 100%; height: 6px; border-radius: 3px; background: rgb(0 0 0 / 10%); }
+.design-report .rollout-progress-track::before { content: ''; display: block; width: 50%; height: 100%; border-radius: inherit; background: #2b2b2b; }
+.design-report .rollout-progress-marker { position: absolute; top: 0; left: 50%; transform: translateX(-50%); box-sizing: border-box; width: 16px; height: 16px; border: 1.5px solid white; border-radius: 50%; background: #2b2b2b; box-shadow: 0 0 2px rgb(0 0 0 / 25%); }
+.design-report [data-name='Value bar'] { overflow: hidden; }
+.design-report [data-node-id='189:6882'] { overflow: visible; }
+.design-report [data-node-id='189:6882'] img { max-width: 100%; object-fit: fill; }
+@container (max-width:600px) {
+  .design-report [data-name^='Metric pair'] { min-width:0; flex-basis:100%; }
+  .design-report [data-name^='Metric pair']>div { min-width:0; flex-basis:100%; }
+  .design-report [data-name='Key readout'] { min-width:0; padding-right:0; }
+  .design-report [data-node-id='296:2808'], .design-report [data-node-id='296:2818'] { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); font-size:10px; }
+  .design-report [data-node-id='296:2808'] p, .design-report [data-node-id='296:2818'] p { width:auto; }
+  .design-report [data-node-id='296:2805'] { font-size:20px; line-height:28px; }
+  .design-report [data-node-id='296:2803'] { font-size:20px; line-height:28px; }
+  .design-report [data-node-id='189:7043'] button { white-space:normal; text-align:left; }
+}
+@media (max-width: 900px) {
+  .design-report { padding-inline: 20px; }
+  .design-report [data-name^='Metric pair'] { min-width: 0; flex-basis: 100%; }
+  .design-report [data-node-id='189:6868'] { padding: 20px; }
+  .design-report [data-name='Key readout'] { min-width: 0; }
+}
+@media (max-width: 600px) {
+  .design-report { padding: 24px 16px; }
+  .design-report [data-node-id='189:6873'] { font-size: 20px; line-height: 28px; }
+  .design-report [data-node-id='189:6872'] { font-size: 20px; line-height: 28px; }
+  .design-report [data-name='Metric labels'], .design-report [data-name='Metric labels'] > div { width: 84px; }
+  .design-report [data-name='Five metric changes'] { padding-right: 24px; }
+  .design-report [data-name='Metric labels'] p { font-size: 10px; }
+  .design-report [data-name='Editable effect and 95% confidence interval'] { padding-right: 12px; }
+  .design-report [data-name='Editable effect and 95% confidence interval'] > p { width: 64px; }
+}

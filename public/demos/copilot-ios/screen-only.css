@@ -1,0 +1,23 @@
+/* The host supplies the shared device frame and shadow for both variants. */
+#root > div {
+  padding: 0 !important;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+}
+
+/* Disable the prototype's second fit-to-device pass. The host already scales
+   the native screen to its container, including all text and controls. */
+#root > div > div {
+  --phone-shell-width: 393px !important;
+  --phone-content-scale: 1 !important;
+}
+
+img[alt="iPhone 16 shell exported from Figma"],
+#phone-dynamic-island-overlay {
+  display: none !important;
+}
+
+#phone-frame {
+  border-radius: 0 !important;
+  clip-path: none !important;
+}

@@ -1,0 +1,50 @@
+.sections { width:100%; min-width:0; display:flex; flex-direction:column; gap:24px; container-type:inline-size; }
+.section { display:flex; flex-direction:column; gap:12px; min-width:0; }
+.section>h2 { margin:0; padding:0 8px; font-size:16px; line-height:16px; font-weight:600; }
+.card { padding:24px; gap:24px; border-radius:14px; box-shadow:0 1px 1px #0000000f; min-width:0; }
+.legend { display:flex; gap:16px; color:var(--muted-foreground); font-size:11px; line-height:16.5px; }
+.legend span { display:flex; gap:6px; align-items:center; }
+.legend i { width:8px; height:8px; border-radius:2px; }
+.checkGrid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:24px; }
+.check { min-width:0; border:.5px solid #00000026; border-radius:12px; padding:12px 16px 16px; }
+.check h3 { font-size:13px; font-weight:500; line-height:19.5px; margin:0 0 8px; }
+.pairPlot { display:flex; height:174px; align-items:flex-end; }
+.yAxis { width:35px; height:145px; flex-shrink:0; padding-bottom:23px; display:flex; flex-direction:column; justify-content:space-between; font-size:10px; line-height:15px; color:var(--muted-foreground); }
+.pair { position:relative; flex:1; display:flex; justify-content:center; align-items:flex-end; height:174px; gap:8px; min-width:0; }
+.baseline { position:absolute; bottom:19.5px; width:100%; height:1px; }
+.barColumn { width:52px; flex-shrink:0; display:flex; align-items:center; flex-direction:column; gap:5px; }
+.bar { width:24px; border-radius:4px 4px 0 0; }
+.barValue { font-size:11px; line-height:16.5px; white-space:nowrap; }
+.groupName { color:var(--muted-foreground); font-size:10px; line-height:15px; }
+.comparisonTitle { font-size:16px; line-height:24px; font-weight:600; }
+.tabs { height:auto; padding:4px; }
+.tabs button { font-size:12px; line-height:18px; padding:8px 12px; }
+.comparisonContent { display:flex; flex-direction:column; gap:12px; }
+.differences { display:flex; height:384px; padding:20px 40px 34px 0; }
+.metricNames { width:130px; flex-shrink:0; display:flex; flex-direction:column; }
+.metricNames button { height:64px; min-height:64px; width:100%; padding:0 8px 0 0; text-align:right; justify-content:flex-end; white-space:normal; font-size:12px; line-height:16px; font-weight:400; color:var(--muted-foreground); }
+.differencePlot { position:relative; height:330px; min-width:0; flex:1; border-left:1px solid var(--border); border-right:1px solid var(--border); }
+.zeroLine { position:absolute; left:50%; width:1px; height:330px; background:#808390; }
+.differenceRow { height:64px; position:relative; }
+.differenceBar { height:22px; position:absolute; top:21px; }
+.delta { position:absolute; top:3px; left:calc(100% + 8px); font-size:12px; line-height:16px; white-space:nowrap; }
+.delta[data-negative=true] { left:auto; right:calc(100% + 8px); }
+.differenceAxis { display:flex; justify-content:space-between; margin-top:18px; font-size:11px; line-height:16px; color:var(--muted-foreground); }
+.questions { display:flex; flex-wrap:wrap; gap:8px; }
+.question { height:auto; min-height:0; padding:8px 16px; font-size:14px; font-weight:500; line-height:20px; border-radius:999px; box-shadow:none; }
+.confirmed { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.confirmed p { background:#e8f5ee; border-radius:10px; padding:14px; font-size:12px; line-height:18px; }
+.columnHead { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:24px; color:var(--muted-foreground); font-size:10px; line-height:15px; }
+.chain { display:grid; grid-template-columns:minmax(0,36fr) 24px minmax(0,62fr); }
+.pending { background:#fcf1e4; padding:14px; border-radius:10px; display:flex; align-items:center; font-size:12px; line-height:18px; }
+.branchConnector { display:flex; align-items:center; justify-content:center; }
+.branches { display:flex; flex-direction:column; gap:12px; min-width:0; }
+.hypothesisRow { display:grid; grid-template-columns:minmax(0,1fr) 24px minmax(0,1fr); }
+.hypothesis,.action { border:1px solid var(--border); border-radius:10px; padding:14px; font-size:12px; line-height:18px; min-width:0; }
+.hypothesis { border-style:dashed; }
+.arrow { display:flex; align-items:center; justify-content:center; }
+.action { display:flex; flex-direction:column; align-items:flex-start; gap:12px; }
+.actionButton { height:auto; min-height:36px; max-width:100%; padding:8px 12px; font-size:12px; font-weight:500; line-height:18px; gap:6px; border-radius:6px; white-space:normal; }
+@container (max-width:900px) { .checkGrid { grid-template-columns:repeat(2,minmax(0,1fr)); } .chain { grid-template-columns:minmax(0,30fr) 24px minmax(0,68fr); } }
+@container (max-width:600px) { .card { padding:16px; } .confirmed { grid-template-columns:1fr; } .columnHead,.branchConnector { display:none; } .chain { grid-template-columns:1fr; gap:12px; } .hypothesisRow { grid-template-columns:1fr; } .arrow { height:24px; transform:rotate(90deg); } .differences { padding-right:28px; } .metricNames { width:70px; margin-right:32px; } .metricNames button { font-size:10px; } }
+@container (max-width:360px) { .checkGrid { grid-template-columns:1fr; } }
